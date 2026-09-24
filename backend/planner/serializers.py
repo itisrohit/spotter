@@ -14,3 +14,10 @@ class TripPlanSerializer(serializers.Serializer):
     dropoff_location = serializers.CharField()
     current_cycle_used = serializers.FloatField(min_value=0, max_value=69.999)
     route_legs = RouteLegSerializer(many=True, allow_empty=False)
+
+
+class LocationTripSerializer(serializers.Serializer):
+    current_location = serializers.CharField()
+    pickup_location = serializers.CharField()
+    dropoff_location = serializers.CharField()
+    current_cycle_used = serializers.FloatField(min_value=0, max_value=69.999)
