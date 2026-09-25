@@ -43,7 +43,9 @@ function MapPanel({ geometry }) {
   useEffect(() => {
     if (!geometry || !mapInstance.current) return undefined
     const map = mapInstance.current
+    let routeRendered = false
     const renderRoute = () => {
+      if (routeRendered) return
       const routeData = { type: 'Feature', properties: {}, geometry }
       const source = map.getSource('route')
       if (source) source.setData(routeData)
@@ -56,10 +58,23 @@ function MapPanel({ geometry }) {
         new maplibregl.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]),
       )
       map.fitBounds(bounds, { padding: 56, maxZoom: 10, duration: 700 })
+      routeRendered = true
     }
-    if (map.isStyleLoaded()) renderRoute()
-    else map.once('load', renderRoute)
-    return undefined
+    const renderWhenReady = () => {
+      if (map.isStyleLoaded()) {
+        map.resize()
+        renderRoute()
+      }
+    }
+    map.on('load', renderWhenReady)
+    map.on('idle', renderWhenReady)
+    renderWhenReady()
+    const retry = window.setTimeout(renderWhenReady, 750)
+    return () => {
+      map.off('load', renderWhenReady)
+      map.off('idle', renderWhenReady)
+      window.clearTimeout(retry)
+    }
   }, [geometry])
 
   return <div className="map" ref={mapContainer} aria-label="Trip route map" />
