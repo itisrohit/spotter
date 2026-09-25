@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import paperLogTemplate from './assets/blank-paper-log.png'
 import './App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
@@ -64,6 +65,50 @@ function DutyLog({ log }) {
         {logStatuses.map(([status, label]) => <span key={status}><strong>{formatHours(log.totals[status])}</strong>{label}</span>)}
       </div>
       {log.remarks.length > 0 && <div className="eld-remarks"><strong>Remarks</strong>{log.remarks.map((remark) => <span key={`${remark.time}-${remark.activity}`}>{formatClock(remark.time)} · {remark.activity} · {remark.location}</span>)}</div>}
+    </article>
+  )
+}
+
+function PaperLog({ log, plan }) {
+  const graph = { left: 65, right: 454, top: 184, bottom: 254 }
+  const statusRows = { OFF_DUTY: 193, SLEEPER: 211, DRIVING: 229, ON_DUTY: 247 }
+  const xForHour = (hour) => graph.left + (hour / 24) * (graph.right - graph.left)
+  const from = plan.locations?.[0]?.query || 'Current location'
+  const to = plan.locations?.at(-1)?.query || 'Dropoff location'
+  const remarks = log.remarks.slice(0, 7)
+  const dutyPath = log.segments.reduce((path, segment, index) => {
+    const startX = xForHour(segment.start_hour)
+    const endX = xForHour(segment.end_hour)
+    const rowY = statusRows[segment.status]
+    if (index === 0) return `M ${startX} ${rowY} H ${endX}`
+    return `${path} V ${rowY} H ${endX}`
+  }, '')
+
+  return (
+    <article className="paper-log-card">
+      <div className="paper-log-title">Filled FMCSA daily log · Day {log.day}</div>
+      <div className="paper-log-sheet">
+        <img src={paperLogTemplate} alt="Blank FMCSA driver daily log template" />
+        <svg className="paper-log-overlay" viewBox="0 0 513 518" role="img" aria-label={`Filled daily log for day ${log.day}`}>
+          <defs>
+            <clipPath id={`paper-log-grid-${log.day}`}>
+              <rect x={graph.left} y={graph.top} width={graph.right - graph.left} height={graph.bottom - graph.top} />
+            </clipPath>
+          </defs>
+          <g className="paper-log-fields">
+            <text x="92" y="48">{from}</text>
+            <text x="292" y="48">{to}</text>
+            <text x="60" y="83">{plan.total_miles}</text>
+            <text x="148" y="83">{plan.total_miles}</text>
+          </g>
+          <g className="paper-log-lines" clipPath={`url(#paper-log-grid-${log.day})`}>
+            <path d={dutyPath} />
+          </g>
+          <g className="paper-log-remarks">
+            {remarks.map((remark, index) => <text key={`${remark.time}-${remark.activity}`} x="165" y={296 + index * 13}>{formatClock(remark.time)} · {remark.activity} · {remark.location}</text>)}
+          </g>
+        </svg>
+      </div>
     </article>
   )
 }
@@ -170,7 +215,7 @@ function App() {
         </section>
       </section>
 
-      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><div className="eld-section"><div className="results-header"><div><p className="eyebrow">COMPLIANCE VIEW</p><h2>Daily ELD logs</h2></div><span className="eld-total">Totals include off-duty time</span></div><div className="eld-list">{plan.daily_logs.map((log) => <DutyLog key={log.day} log={log} />)}</div></div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
+      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><div className="eld-section"><div className="results-header"><div><p className="eyebrow">COMPLIANCE VIEW</p><h2>Daily ELD logs</h2></div><span className="eld-total">Totals include off-duty time</span></div><div className="eld-list">{plan.daily_logs.map((log) => <DutyLog key={log.day} log={log} />)}</div></div><div className="paper-log-section"><div className="results-header"><div><p className="eyebrow">ASSESSMENT OUTPUT</p><h2>Filled daily log sheets</h2></div><span className="eld-total">Based on supplied FMCSA template</span></div><div className="paper-log-list">{plan.daily_logs.map((log) => <PaperLog key={`paper-${log.day}`} log={log} plan={plan} />)}</div></div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
     </main>
   )
 }
