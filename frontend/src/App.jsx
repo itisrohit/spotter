@@ -113,7 +113,7 @@ function PaperLog({ log, plan }) {
   )
 }
 
-function MapPanel({ geometry, locations, segments }) {
+function MapPanel({ geometry, locations, segments, totalMiles }) {
   const mapContainer = useRef(null)
   const mapInstance = useRef(null)
   const routeLayer = useRef(null)
@@ -156,10 +156,41 @@ function MapPanel({ geometry, locations, segments }) {
         fillOpacity: 1,
       }).bindPopup(`<strong>${label}</strong><br>${location.query}${activities.length ? `<br><br>${activities.join('<br>')}` : ''}`).addTo(routeLayer.current)
     })
+    const eventStyles = {
+      Fueling: { label: 'Fuel stop', color: '#d97706' },
+      '30-minute rest break': { label: '30-minute rest', color: '#7a62a4' },
+      '10-hour daily rest': { label: '10-hour sleeper rest', color: '#5b4a8a' },
+      '34-hour cycle restart': { label: '34-hour cycle restart', color: '#334155' },
+    }
+    const eventGroups = new Map()
+    segments.filter((segment) => eventStyles[segment.activity]).forEach((segment) => {
+      const knownLocation = locations.find((location) => location.query === segment.location)
+      const enRouteMiles = segment.location.match(/^En route \(([\d.]+) mi\)$/)?.[1]
+      const routeIndex = enRouteMiles && totalMiles
+        ? Math.min(geometry.coordinates.length - 1, Math.round(Number(enRouteMiles) / totalMiles * (geometry.coordinates.length - 1)))
+        : null
+      const routeCoordinate = routeIndex === null ? null : geometry.coordinates[routeIndex]
+      const position = knownLocation
+        ? [knownLocation.latitude, knownLocation.longitude]
+        : routeCoordinate
+          ? [routeCoordinate[1], routeCoordinate[0]]
+          : null
+      if (!position) return
+      const key = knownLocation ? `location:${knownLocation.query}` : `route:${routeIndex}`
+      const group = eventGroups.get(key) || { position, location: segment.location, events: [] }
+      group.events.push({ ...eventStyles[segment.activity], duration: formatHours(segment.duration_hours) })
+      eventGroups.set(key, group)
+    })
+    eventGroups.forEach((group) => {
+      const popup = group.events.map((event) => `${event.label} · ${event.duration}`).join('<br>')
+      L.circleMarker(group.position, { radius: 7, color: '#fffdf8', weight: 2, fillColor: '#7a62a4', fillOpacity: 1 })
+        .bindPopup(`<strong>Route events</strong><br>${group.location}<br><br>${popup}`)
+        .addTo(routeLayer.current)
+    })
     map.fitBounds(L.latLngBounds(coordinates), { padding: [56, 56], maxZoom: 10 })
     window.requestAnimationFrame(() => map.invalidateSize())
     return () => routeLayer.current?.remove()
-  }, [geometry, locations, segments])
+  }, [geometry, locations, segments, totalMiles])
 
   return <>
     <div className="map" ref={mapContainer} aria-label="Trip route map" />
@@ -167,6 +198,7 @@ function MapPanel({ geometry, locations, segments }) {
       <span><i className="legend-dot legend-current" />Current</span>
       <span><i className="legend-dot legend-pickup" />Pickup</span>
       <span><i className="legend-dot legend-dropoff" />Dropoff</span>
+      <span><i className="legend-dot legend-event" />Rest / fuel</span>
     </div>
   </>
 }
@@ -230,7 +262,7 @@ function App() {
 
         <section className="panel map-panel">
           <div className="panel-heading map-heading"><div><p className="eyebrow">LIVE ROUTE</p><h3>{plan ? `${plan.total_miles} miles` : 'Route preview'}</h3></div>{plan && <span className="route-time">{formatHours(plan.drive_hours)} driving</span>}</div>
-          {plan ? <MapPanel geometry={plan.geometry} locations={plan.locations} segments={plan.segments} /> : <div className="empty-map"><div className="empty-icon">⌁</div><h3>Your route will appear here</h3><p>Enter trip details and build a plan to see the route and legal rest sequence.</p></div>}
+          {plan ? <MapPanel geometry={plan.geometry} locations={plan.locations} segments={plan.segments} totalMiles={plan.total_miles} /> : <div className="empty-map"><div className="empty-icon">⌁</div><h3>Your route will appear here</h3><p>Enter trip details and build a plan to see the route and legal rest sequence.</p></div>}
         </section>
       </section>
 
