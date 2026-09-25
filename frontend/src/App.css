@@ -111,3 +111,11 @@ body { background: #f6f7f9; }
 .results { border-top: 1px solid #dfe5e9; }
 .results h2 { color: #202a33; }
 .timeline-row:hover { background: #f8fafb; }
+.paper-log-totals text { fill: #20201c; font: 7px Arial, sans-serif; font-weight: 700; }
+.paper-log-meta { margin: -10px 0 12px; color: #77736b; font-size: 11px; line-height: 1.5; }
+.optional-fields { margin: 4px 0 2px; border-top: 1px solid #e6e8e8; padding-top: 12px; }
+.optional-fields summary { cursor: pointer; color: #555b5d; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.optional-fields summary span { color: #999f9f; font-weight: 500; margin-left: 5px; }
+.optional-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.optional-fields-grid label { font-size: 11px; }
+.optional-fields-grid input { margin-top: 5px; padding: 9px 10px; font-size: 13px; }

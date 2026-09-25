@@ -11,6 +11,17 @@ const initialForm = {
   pickup_location: 'Indianapolis, IN',
   dropoff_location: 'Columbus, OH',
   current_cycle_used: 0,
+  paper_date: new Date().toISOString().slice(0, 10),
+  paper_driver: '',
+  paper_initials: '',
+  paper_signature: '',
+  paper_co_driver: '',
+  paper_carrier: '',
+  paper_terminal: '',
+  paper_truck: '',
+  paper_trailer: '',
+  paper_load_id: '',
+  paper_commodity: '',
 }
 
 function formatHours(hours) {
@@ -25,6 +36,35 @@ function formatClock(hours) {
   const hour = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function formatPaperDate(value) {
+  if (!value) return 'N/A'
+  const [year, month, day] = value.split('-')
+  return year && month && day ? `${month}/${day}/${year}` : value
+}
+
+function buildPaperPlan(plan, form) {
+  const firstLog = plan.daily_logs?.[0]
+  const shiftWork = firstLog ? (firstLog.totals.DRIVING + firstLog.totals.ON_DUTY).toFixed(1) : 'N/A'
+  return {
+    ...plan,
+    paper_fields: {
+      date: formatPaperDate(form.paper_date),
+      driver: form.paper_driver || 'N/A',
+      initials: form.paper_initials || 'N/A',
+      signature: form.paper_signature || 'N/A',
+      co_driver: form.paper_co_driver || 'N/A',
+      carrier: form.paper_carrier || 'N/A',
+      office: form.paper_terminal || 'N/A',
+      terminal: form.paper_terminal || 'N/A',
+      truck: form.paper_truck || 'N/A',
+      trailer: form.paper_trailer || 'N/A',
+      load_id: form.paper_load_id || 'N/A',
+      commodity: form.paper_commodity || 'N/A',
+      shift_work: `${shiftWork}h`,
+    },
+  }
 }
 
 const logStatuses = [
@@ -69,13 +109,15 @@ function DutyLog({ log }) {
   )
 }
 
-function PaperLog({ log, plan }) {
+function PaperLog({ log, plan, title = `Filled FMCSA daily log · Day ${log.day}` }) {
   const graph = { left: 65, right: 454, top: 184, bottom: 254 }
   const statusRows = { OFF_DUTY: 193, SLEEPER: 211, DRIVING: 229, ON_DUTY: 247 }
   const xForHour = (hour) => graph.left + (hour / 24) * (graph.right - graph.left)
   const from = plan.locations?.[0]?.query || 'Current location'
   const to = plan.locations?.at(-1)?.query || 'Dropoff location'
   const remarks = log.remarks.slice(0, 7)
+  const fields = plan.paper_fields || {}
+  const dateParts = fields.date?.split('/') || []
   const dutyPath = log.segments.reduce((path, segment, index) => {
     const startX = xForHour(segment.start_hour)
     const endX = xForHour(segment.end_hour)
@@ -86,7 +128,8 @@ function PaperLog({ log, plan }) {
 
   return (
     <article className="paper-log-card">
-      <div className="paper-log-title">Filled FMCSA daily log · Day {log.day}</div>
+      <div className="paper-log-title">{title}</div>
+      {fields.driver && <div className="paper-log-meta">Date {fields.date} · Driver {fields.driver} · Initials {fields.initials} · Signature {fields.signature} · Co-driver {fields.co_driver} · Load {fields.load_id} · {fields.commodity} · Work {fields.shift_work}</div>}
       <div className="paper-log-sheet">
         <img src={paperLogTemplate} alt="Blank FMCSA driver daily log template" />
         <svg className="paper-log-overlay" viewBox="0 0 513 518" role="img" aria-label={`Filled daily log for day ${log.day}`}>
@@ -96,16 +139,27 @@ function PaperLog({ log, plan }) {
             </clipPath>
           </defs>
           <g className="paper-log-fields">
-            <text x="92" y="48">{from}</text>
-            <text x="292" y="48">{to}</text>
+            {dateParts.map((part, index) => <text key={`date-${part}-${index}`} x={[185, 229, 272][index]} y="19" textAnchor="middle">{part}</text>)}
+            <text x="150" y="44" textAnchor="middle">{from}</text>
+            <text x="350" y="44" textAnchor="middle">{to}</text>
             <text x="60" y="83">{plan.total_miles}</text>
             <text x="148" y="83">{plan.total_miles}</text>
+            {fields.carrier && <text x="348" y="76" textAnchor="middle">{fields.carrier}</text>}
+            {fields.office && <text x="348" y="97" textAnchor="middle">{fields.office}</text>}
+            {fields.terminal && <text x="348" y="120" textAnchor="middle">{fields.terminal}</text>}
+            {fields.truck && <text x="60" y="112">{fields.truck} / {fields.trailer}</text>}
           </g>
           <g className="paper-log-lines" clipPath={`url(#paper-log-grid-${log.day})`}>
             <path d={dutyPath} />
           </g>
           <g className="paper-log-remarks">
             {remarks.map((remark, index) => <text key={`${remark.time}-${remark.activity}`} x="165" y={296 + index * 13}>{formatClock(remark.time)} · {remark.activity} · {remark.location}</text>)}
+          </g>
+          <g className="paper-log-totals">
+            <text x="471" y="193">{log.totals.OFF_DUTY}</text>
+            <text x="471" y="211">{log.totals.SLEEPER}</text>
+            <text x="471" y="229">{log.totals.DRIVING}</text>
+            <text x="471" y="247">{log.totals.ON_DUTY}</text>
           </g>
         </svg>
       </div>
@@ -241,6 +295,8 @@ function App() {
     }
   }
 
+  const paperPlan = plan ? buildPaperPlan(plan, form) : null
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -261,6 +317,22 @@ function App() {
           <label>Pickup location<input name="pickup_location" value={form.pickup_location} onChange={updateField} required /></label>
           <label>Dropoff location<input name="dropoff_location" value={form.dropoff_location} onChange={updateField} required /></label>
           <label>Current cycle used <span className="input-suffix">hours</span><input name="current_cycle_used" type="number" min="0" max="69.99" step="0.5" value={form.current_cycle_used} onChange={updateField} required /></label>
+          <details className="optional-fields">
+            <summary>Paper log details <span>optional</span></summary>
+            <div className="optional-fields-grid">
+              <label>Date<input name="paper_date" type="date" value={form.paper_date} onChange={updateField} /></label>
+              <label>Driver number<input name="paper_driver" value={form.paper_driver} onChange={updateField} placeholder="N/A" /></label>
+              <label>Initials<input name="paper_initials" value={form.paper_initials} onChange={updateField} placeholder="N/A" /></label>
+              <label>Signature<input name="paper_signature" value={form.paper_signature} onChange={updateField} placeholder="N/A" /></label>
+              <label>Co-driver<input name="paper_co_driver" value={form.paper_co_driver} onChange={updateField} placeholder="N/A" /></label>
+              <label>Carrier<input name="paper_carrier" value={form.paper_carrier} onChange={updateField} placeholder="N/A" /></label>
+              <label>Home terminal<input name="paper_terminal" value={form.paper_terminal} onChange={updateField} placeholder="N/A" /></label>
+              <label>Truck / tractor<input name="paper_truck" value={form.paper_truck} onChange={updateField} placeholder="N/A" /></label>
+              <label>Trailer<input name="paper_trailer" value={form.paper_trailer} onChange={updateField} placeholder="N/A" /></label>
+              <label>Load ID<input name="paper_load_id" value={form.paper_load_id} onChange={updateField} placeholder="N/A" /></label>
+              <label>Commodity<input name="paper_commodity" value={form.paper_commodity} onChange={updateField} placeholder="N/A" /></label>
+            </div>
+          </details>
           <button className="primary-button" type="submit" disabled={loading}>{loading ? 'Building plan…' : 'Build trip plan'} <span>→</span></button>
           {error && <p className="error-message">{error}</p>}
           <p className="form-note">Uses OpenStreetMap geocoding and OSRM routing for this assessment prototype.</p>
@@ -272,7 +344,7 @@ function App() {
         </section>
       </section>
 
-      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><div className="eld-section"><div className="results-header"><div><p className="eyebrow">COMPLIANCE VIEW</p><h2>Daily ELD logs</h2></div><span className="eld-total">Totals include off-duty time</span></div><div className="eld-list">{plan.daily_logs.map((log) => <DutyLog key={log.day} log={log} />)}</div></div><div className="paper-log-section"><div className="results-header"><div><p className="eyebrow">ASSESSMENT OUTPUT</p><h2>Filled daily log sheets</h2></div><span className="eld-total">Based on supplied FMCSA template</span></div><div className="paper-log-list">{plan.daily_logs.map((log) => <PaperLog key={`paper-${log.day}`} log={log} plan={plan} />)}</div></div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
+      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><div className="eld-section"><div className="results-header"><div><p className="eyebrow">COMPLIANCE VIEW</p><h2>Daily ELD logs</h2></div><span className="eld-total">Totals include off-duty time</span></div><div className="eld-list">{plan.daily_logs.map((log) => <DutyLog key={log.day} log={log} />)}</div></div><div className="paper-log-section"><div className="results-header"><div><p className="eyebrow">ASSESSMENT OUTPUT</p><h2>Filled daily log sheets</h2></div><span className="eld-total">Based on supplied FMCSA template</span></div><div className="paper-log-list">{plan.daily_logs.map((log) => <PaperLog key={`paper-${log.day}`} log={log} plan={paperPlan} />)}</div></div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
     </main>
   )
 }
