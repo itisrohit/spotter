@@ -113,7 +113,7 @@ function PaperLog({ log, plan }) {
   )
 }
 
-function MapPanel({ geometry }) {
+function MapPanel({ geometry, locations, segments }) {
   const mapContainer = useRef(null)
   const mapInstance = useRef(null)
   const routeLayer = useRef(null)
@@ -142,14 +142,33 @@ function MapPanel({ geometry }) {
       style: { color: '#f97316', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' },
     }).addTo(routeLayer.current)
     const coordinates = geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude])
-    L.circleMarker(coordinates[0], { radius: 8, color: '#fffdf8', weight: 3, fillColor: '#ef6c3b', fillOpacity: 1 }).addTo(routeLayer.current)
-    L.circleMarker(coordinates.at(-1), { radius: 8, color: '#fffdf8', weight: 3, fillColor: '#252520', fillOpacity: 1 }).addTo(routeLayer.current)
+    locations.forEach((location, index) => {
+      const activities = segments
+        .filter((segment) => segment.location === location.query && segment.activity !== 'Off duty')
+        .map((segment) => `${segment.activity} · ${formatHours(segment.duration_hours)}`)
+      const label = index === 0 ? 'Current location' : index === locations.length - 1 ? 'Dropoff' : 'Pickup'
+      const color = index === 0 ? '#ef6c3b' : index === locations.length - 1 ? '#252520' : '#4369a5'
+      L.circleMarker([location.latitude, location.longitude], {
+        radius: 7,
+        color: '#fffdf8',
+        weight: 3,
+        fillColor: color,
+        fillOpacity: 1,
+      }).bindPopup(`<strong>${label}</strong><br>${location.query}${activities.length ? `<br><br>${activities.join('<br>')}` : ''}`).addTo(routeLayer.current)
+    })
     map.fitBounds(L.latLngBounds(coordinates), { padding: [56, 56], maxZoom: 10 })
     window.requestAnimationFrame(() => map.invalidateSize())
     return () => routeLayer.current?.remove()
-  }, [geometry])
+  }, [geometry, locations, segments])
 
-  return <div className="map" ref={mapContainer} aria-label="Trip route map" />
+  return <>
+    <div className="map" ref={mapContainer} aria-label="Trip route map" />
+    <div className="map-legend" aria-label="Map marker legend">
+      <span><i className="legend-dot legend-current" />Current</span>
+      <span><i className="legend-dot legend-pickup" />Pickup</span>
+      <span><i className="legend-dot legend-dropoff" />Dropoff</span>
+    </div>
+  </>
 }
 
 function App() {
@@ -211,7 +230,7 @@ function App() {
 
         <section className="panel map-panel">
           <div className="panel-heading map-heading"><div><p className="eyebrow">LIVE ROUTE</p><h3>{plan ? `${plan.total_miles} miles` : 'Route preview'}</h3></div>{plan && <span className="route-time">{formatHours(plan.drive_hours)} driving</span>}</div>
-          {plan ? <MapPanel geometry={plan.geometry} /> : <div className="empty-map"><div className="empty-icon">⌁</div><h3>Your route will appear here</h3><p>Enter trip details and build a plan to see the route and legal rest sequence.</p></div>}
+          {plan ? <MapPanel geometry={plan.geometry} locations={plan.locations} segments={plan.segments} /> : <div className="empty-map"><div className="empty-icon">⌁</div><h3>Your route will appear here</h3><p>Enter trip details and build a plan to see the route and legal rest sequence.</p></div>}
         </section>
       </section>
 
