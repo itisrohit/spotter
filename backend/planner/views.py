@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import APIException
 from rest_framework.views import APIView
 
-from .hos import RouteLeg, plan_trip
+from .hos import RouteLeg, build_daily_logs, plan_trip
 from .routing import RoutingError, route_locations
 from .serializers import LocationTripSerializer, TripPlanSerializer
 
@@ -24,7 +24,10 @@ class TripPlanView(APIView):
             current_cycle_used=data['current_cycle_used'],
             route_legs=[RouteLeg(**leg) for leg in data['route_legs']],
         )
-        return Response({'segments': [segment.to_dict() for segment in segments]})
+        return Response({
+            'segments': [segment.to_dict() for segment in segments],
+            'daily_logs': build_daily_logs(segments),
+        })
 
 
 class RoutePlanView(APIView):
@@ -50,6 +53,10 @@ class RoutePlanView(APIView):
             current_cycle_used=data['current_cycle_used'],
             route_legs=[RouteLeg(**leg) for leg in route['route_legs']],
         )
-        return Response({**route, 'segments': [segment.to_dict() for segment in segments]})
+        return Response({
+            **route,
+            'segments': [segment.to_dict() for segment in segments],
+            'daily_logs': build_daily_logs(segments),
+        })
 
 # Create your views here.

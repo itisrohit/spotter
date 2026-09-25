@@ -19,6 +19,55 @@ function formatHours(hours) {
   return `${wholeHours}h ${minutes}m`
 }
 
+function formatClock(hours) {
+  const totalMinutes = Math.round(hours * 60)
+  const hour = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const logStatuses = [
+  ['OFF_DUTY', 'Off duty'],
+  ['SLEEPER', 'Sleeper'],
+  ['DRIVING', 'Driving'],
+  ['ON_DUTY', 'On duty'],
+]
+
+function DutyLog({ log }) {
+  return (
+    <article className="eld-card">
+      <div className="eld-header">
+        <div><p className="eyebrow">ELD RECORD</p><h3>Day {log.day}</h3></div>
+        <span className="eld-total">24-hour log</span>
+      </div>
+      <div className="eld-grid">
+        <div className="eld-labels">
+          {logStatuses.map(([, label]) => <span key={label}>{label}</span>)}
+        </div>
+        <div className="eld-tracks">
+          {logStatuses.map(([status]) => (
+            <div className="eld-track" key={status}>
+              {log.segments.filter((segment) => segment.status === status).map((segment) => (
+                <span
+                  className={`eld-segment eld-${status.toLowerCase()}`}
+                  key={`${status}-${segment.start_hour}-${segment.activity}`}
+                  title={`${segment.activity} · ${formatClock(segment.start_hour)}–${formatClock(segment.end_hour)}`}
+                  style={{ left: `${segment.start_hour / 24 * 100}%`, width: `${segment.duration_hours / 24 * 100}%` }}
+                />
+              ))}
+            </div>
+          ))}
+          <div className="eld-hours"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+        </div>
+      </div>
+      <div className="eld-summary">
+        {logStatuses.map(([status, label]) => <span key={status}><strong>{formatHours(log.totals[status])}</strong>{label}</span>)}
+      </div>
+      {log.remarks.length > 0 && <div className="eld-remarks"><strong>Remarks</strong>{log.remarks.map((remark) => <span key={`${remark.time}-${remark.activity}`}>{formatClock(remark.time)} · {remark.activity} · {remark.location}</span>)}</div>}
+    </article>
+  )
+}
+
 function MapPanel({ geometry }) {
   const mapContainer = useRef(null)
   const mapInstance = useRef(null)
@@ -121,7 +170,7 @@ function App() {
         </section>
       </section>
 
-      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
+      {plan && <section className="results"><div className="results-header"><div><p className="eyebrow">PLAN OUTPUT</p><h2>Duty timeline</h2></div><div className="result-stats"><span><strong>{plan.total_miles}</strong> miles</span><span><strong>{formatHours(plan.drive_hours)}</strong> drive time</span><span><strong>{plan.segments.length}</strong> segments</span></div></div><div className="timeline-list">{plan.segments.map((segment, index) => <article className="timeline-row" key={`${segment.start_hour}-${segment.activity}`}><div className="timeline-index">{String(index + 1).padStart(2, '0')}</div><div className={`duty-dot duty-${segment.status.toLowerCase()}`} /><div className="timeline-main"><strong>{segment.activity}</strong><span>{segment.location}</span></div><div className="timeline-status">{segment.status.replace('_', ' ')}</div><div className="timeline-time">{formatHours(segment.duration_hours)}</div></article>)}</div><div className="eld-section"><div className="results-header"><div><p className="eyebrow">COMPLIANCE VIEW</p><h2>Daily ELD logs</h2></div><span className="eld-total">Totals include off-duty time</span></div><div className="eld-list">{plan.daily_logs.map((log) => <DutyLog key={log.day} log={log} />)}</div></div><p className="attribution">Map data © OpenStreetMap contributors · Routing by OSRM</p></section>}
     </main>
   )
 }

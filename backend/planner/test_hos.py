@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from planner.hos import RouteLeg, plan_trip
+from planner.hos import RouteLeg, build_daily_logs, plan_trip
 
 
 class HOSPlannerTests(SimpleTestCase):
@@ -35,3 +35,14 @@ class HOSPlannerTests(SimpleTestCase):
     def test_cycle_restart_is_inserted_when_needed(self):
         segments = self.make_plan(current_cycle_used=69, route_legs=[RouteLeg('Short haul', 100, 2, 'Indianapolis, IN')])
         self.assertIn('34-hour cycle restart', [segment.activity for segment in segments])
+
+    def test_daily_log_totals_add_up_to_24_hours(self):
+        logs = build_daily_logs(self.make_plan())
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(sum(logs[0]['totals'].values()), 24)
+
+    def test_daily_logs_split_segments_at_midnight(self):
+        logs = build_daily_logs(self.make_plan(route_legs=[RouteLeg('Long haul', 900, 18, 'Indianapolis, IN')]))
+        self.assertGreaterEqual(len(logs), 2)
+        for log in logs:
+            self.assertEqual(sum(log['totals'].values()), 24)

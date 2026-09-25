@@ -7,6 +7,7 @@ segments that can be rendered on an ELD log.
 """
 
 from dataclasses import asdict, dataclass
+from math import ceil
 
 
 MAX_DRIVING_HOURS = 11.0
@@ -49,6 +50,76 @@ class DutySegment:
 
 class HOSPlanningError(ValueError):
     """Raised when route input cannot be planned safely."""
+
+
+LOG_STATUSES = ('OFF_DUTY', 'SLEEPER', 'DRIVING', 'ON_DUTY')
+
+
+def build_daily_logs(segments: list[DutySegment]) -> list[dict]:
+    """Split absolute duty segments into 24-hour ELD log days.
+
+    Empty time between planned activities is explicitly represented as
+    off-duty so every log has four status totals that add up to 24 hours.
+    """
+    if not segments:
+        return []
+
+    total_hours = max(segment.end_hour for segment in segments)
+    day_count = max(1, ceil(total_hours / 24))
+    logs = []
+
+    for day_index in range(day_count):
+        day_start = day_index * 24
+        day_end = day_start + 24
+        cursor = 0.0
+        day_segments = []
+
+        def append_segment(start_hour, duration_hours, status, location, activity):
+            if duration_hours <= 0:
+                return
+            day_segments.append({
+                'start_hour': round(start_hour, 2),
+                'duration_hours': round(duration_hours, 2),
+                'end_hour': round(start_hour + duration_hours, 2),
+                'status': status,
+                'location': location,
+                'activity': activity,
+            })
+
+        for segment in segments:
+            if segment.end_hour <= day_start or segment.start_hour >= day_end:
+                continue
+            local_start = max(segment.start_hour, day_start) - day_start
+            local_end = min(segment.end_hour, day_end) - day_start
+            if local_start > cursor:
+                append_segment(cursor, local_start - cursor, 'OFF_DUTY', segment.location, 'Off duty')
+            append_segment(local_start, local_end - local_start, segment.status, segment.location, segment.activity)
+            cursor = local_end
+
+        if cursor < 24:
+            append_segment(cursor, 24 - cursor, 'OFF_DUTY', '—', 'Off duty')
+
+        totals = {status: 0.0 for status in LOG_STATUSES}
+        for segment in day_segments:
+            totals[segment['status']] += segment['duration_hours']
+        totals = {status: round(hours, 2) for status, hours in totals.items()}
+        remarks = [
+            {
+                'time': segment['start_hour'],
+                'location': segment['location'],
+                'activity': segment['activity'],
+            }
+            for segment in day_segments
+            if segment['activity'] != 'Off duty'
+        ]
+        logs.append({
+            'day': day_index + 1,
+            'segments': day_segments,
+            'totals': totals,
+            'remarks': remarks,
+        })
+
+    return logs
 
 
 def _validate_route_leg(leg: RouteLeg) -> None:
