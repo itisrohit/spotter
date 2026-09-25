@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import * as maplibregl from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import * as L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import './App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
@@ -22,18 +22,17 @@ function formatHours(hours) {
 function MapPanel({ geometry }) {
   const mapContainer = useRef(null)
   const mapInstance = useRef(null)
+  const routeLayer = useRef(null)
 
   useEffect(() => {
     if (mapInstance.current || !mapContainer.current) return undefined
-    const map = new maplibregl.Map({
-      container: mapContainer.current,
-      style: 'https://tiles.openfreemap.org/styles/liberty',
-      center: [-87.63, 41.88],
-      zoom: 5,
-      attributionControl: true,
-    })
-    map.addControl(new maplibregl.NavigationControl(), 'top-right')
+    const map = L.map(mapContainer.current, { zoomControl: true }).setView([41.88, -87.63], 5)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map)
     mapInstance.current = map
+    window.requestAnimationFrame(() => map.invalidateSize())
     return () => {
       map.remove()
       mapInstance.current = null
@@ -43,38 +42,17 @@ function MapPanel({ geometry }) {
   useEffect(() => {
     if (!geometry || !mapInstance.current) return undefined
     const map = mapInstance.current
-    let routeRendered = false
-    const renderRoute = () => {
-      if (routeRendered) return
-      const routeData = { type: 'Feature', properties: {}, geometry }
-      const source = map.getSource('route')
-      if (source) source.setData(routeData)
-      else {
-        map.addSource('route', { type: 'geojson', data: routeData })
-        map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#f97316', 'line-width': 5, 'line-opacity': 0.9 } })
-      }
-      const bounds = geometry.coordinates.reduce(
-        (result, coordinate) => result.extend(coordinate),
-        new maplibregl.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]),
-      )
-      map.fitBounds(bounds, { padding: 56, maxZoom: 10, duration: 700 })
-      routeRendered = true
-    }
-    const renderWhenReady = () => {
-      if (map.isStyleLoaded()) {
-        map.resize()
-        renderRoute()
-      }
-    }
-    map.on('load', renderWhenReady)
-    map.on('idle', renderWhenReady)
-    renderWhenReady()
-    const retry = window.setTimeout(renderWhenReady, 750)
-    return () => {
-      map.off('load', renderWhenReady)
-      map.off('idle', renderWhenReady)
-      window.clearTimeout(retry)
-    }
+    routeLayer.current?.remove()
+    routeLayer.current = L.layerGroup().addTo(map)
+    L.geoJSON({ type: 'Feature', properties: {}, geometry }, {
+      style: { color: '#f97316', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' },
+    }).addTo(routeLayer.current)
+    const coordinates = geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude])
+    L.circleMarker(coordinates[0], { radius: 8, color: '#fffdf8', weight: 3, fillColor: '#ef6c3b', fillOpacity: 1 }).addTo(routeLayer.current)
+    L.circleMarker(coordinates.at(-1), { radius: 8, color: '#fffdf8', weight: 3, fillColor: '#252520', fillOpacity: 1 }).addTo(routeLayer.current)
+    map.fitBounds(L.latLngBounds(coordinates), { padding: [56, 56], maxZoom: 10 })
+    window.requestAnimationFrame(() => map.invalidateSize())
+    return () => routeLayer.current?.remove()
   }, [geometry])
 
   return <div className="map" ref={mapContainer} aria-label="Trip route map" />
