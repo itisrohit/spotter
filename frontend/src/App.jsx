@@ -127,7 +127,9 @@ function MapPanel({ geometry, locations, segments, totalMiles }) {
     }).addTo(map)
     mapInstance.current = map
     window.requestAnimationFrame(() => map.invalidateSize())
+    const resizeTimer = window.setTimeout(() => map.invalidateSize(), 300)
     return () => {
+      window.clearTimeout(resizeTimer)
       map.remove()
       mapInstance.current = null
     }
@@ -189,7 +191,11 @@ function MapPanel({ geometry, locations, segments, totalMiles }) {
     })
     map.fitBounds(L.latLngBounds(coordinates), { padding: [56, 56], maxZoom: 10 })
     window.requestAnimationFrame(() => map.invalidateSize())
-    return () => routeLayer.current?.remove()
+    const resizeTimer = window.setTimeout(() => map.invalidateSize(), 300)
+    return () => {
+      window.clearTimeout(resizeTimer)
+      routeLayer.current?.remove()
+    }
   }, [geometry, locations, segments, totalMiles])
 
   return <>
