@@ -122,7 +122,18 @@ The four trip fields are the required assessment inputs. The optional **Paper lo
 
 ## Free deployment
 
-The frontend can be deployed as a static site and the Django API as a Python web service. Configure the production frontend variable with the deployed API URL:
+The current Rollout deployment is live at:
+
+- Frontend: https://frontend-1813.rollout.click
+- Backend health check: https://backend-b76a.rollout.click/health/
+
+The frontend is deployed as a React web service and the Django API as a Python web service. The repository includes a helper script that configures both linked Rollout apps and verifies the production bundle:
+
+```bash
+bash scripts/deploy-rollout.sh
+```
+
+For another host, configure the production frontend variable with the deployed API URL:
 
 ```env
 VITE_API_BASE_URL=https://your-api-host.example/api
@@ -139,5 +150,5 @@ For production, set `DEBUG=False`, provide a secret `SECRET_KEY`, configure `ALL
 - [x] Filled FMCSA daily log sheets
 - [x] Multiple daily logs for longer trips
 - [x] Lint and automated tests
-- [ ] Hosted application URL
+- [x] Hosted application URL
 - [ ] 3–5 minute Loom walkthrough URL

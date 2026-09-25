@@ -121,7 +121,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-CORS_ALLOWED_ORIGINS = [
+configured_cors_origins = [
     origin.strip()
     for origin in os.getenv(
         'CORS_ALLOWED_ORIGINS',
@@ -129,6 +129,10 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+    *configured_cors_origins,
+    'https://frontend-1813.rollout.click',
+]))
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -1,0 +1,7 @@
+# Written by `rollout`. Anything listed here is not uploaded.
+node_modules
+dist
+.env
+.env.*
+*.log
+.DS_Store

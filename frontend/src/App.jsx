@@ -4,7 +4,10 @@ import 'leaflet/dist/leaflet.css'
 import paperLogTemplate from './assets/blank-paper-log.png'
 import './App.css'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+const productionApiBaseUrl = 'https://backend-b76a.rollout.click/api'
+const localApiBaseUrl = 'http://127.0.0.1:8000/api'
+const API_BASE_URL = configuredApiBaseUrl || (import.meta.env.PROD ? productionApiBaseUrl : localApiBaseUrl)
 
 const initialForm = {
   current_location: 'Chicago, IL',

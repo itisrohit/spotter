@@ -1,0 +1,7 @@
+# Written by `rollout`. Anything listed here is not uploaded.
+.venv
+__pycache__
+.env
+.env.*
+*.log
+.DS_Store

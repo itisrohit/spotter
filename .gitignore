@@ -47,3 +47,4 @@ pnpm-debug.log*
 # Local project tooling
 .python-version
 *.local
+.rollout/
